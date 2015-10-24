@@ -1,5 +1,5 @@
-#ifndef __RENDER_H__
-#define __RENDER_H__
+#ifndef SESIMULATOR_SESERVER_RENDER_H
+#define SESIMULATOR_SESERVER_RENDER_H
 
 /* X library headers */
 #include <X11/Xlib.h>
@@ -33,7 +33,6 @@ extern pthread_mutex_t frame_buffer_lock;
 extern bool render_flag;
 
 void render(void);
-void render_frame_buffer(void);
 void init_display(void);
 void set_pixel(int i, int j, Pixel p);
 

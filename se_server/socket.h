@@ -17,11 +17,11 @@
 
 // project specific includes
 #include "sprite_engine_commands.h"
+#include "sprite_engine.h"
 
 // meat and taters
-#define PORT_NUMBER 1985
 #define BACKLOG_LEN 1
-#define SOCKET_FILENAME "../se_socket"
+#define SOCKET_PORT 1985
 
 void init_socket(void);
 

@@ -113,6 +113,7 @@ void render_frame_buffer()
 
 void set_pixel(int i, int j, Pixel p)
 {
+  render_flag = true;
   frame_buffer[(j * PIXELS_WIDTH) + i] = p;
 }
 
@@ -120,11 +121,15 @@ void render()
 {
   Pixel *temp;
 
+  if (render_flag == false)
+    return;
+
   pthread_mutex_lock(&frame_buffer_lock);
   temp = read_buffer;
   read_buffer = frame_buffer;
   frame_buffer = read_buffer;
 
-  render_flag = true;
+  render_flag = false;
   pthread_mutex_unlock(&frame_buffer_lock);
+  render_frame_buffer();
 }

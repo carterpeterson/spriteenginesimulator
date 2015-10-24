@@ -2,25 +2,28 @@
 
 pthread_t server_socket_thread;
 
-int open_local_socket(void)
+int open_socket(void)
 {
-  struct sockaddr_un server_name;
-  int sock, size;
+  struct sockaddr_in socket_name;
+  int sock;
 
   /* Create the socket. */
-  sock = socket(PF_LOCAL, SOCK_STREAM, 0);
+  sock = socket(PF_INET, SOCK_STREAM, 0);
   if (sock < 0) {
     perror("socket");
     exit(EXIT_FAILURE);
   }
 
-  // bind socket to 1985
-  server_name.sun_family = AF_LOCAL;
-  strncpy(server_name.sun_path, SOCKET_FILENAME, sizeof(server_name.sun_path));
-  server_name.sun_path[sizeof(server_name.sun_path) - 1] = '\0';
+  // reuse the address if we messed up closing (likely)
+  if (setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &(int){ 1 }, sizeof(int)) < 0)
+    perror("setsockopt(SO_REUSEADDR) failed");
 
-  size = (offsetof (struct sockaddr_un, sun_path) + strlen (server_name.sun_path));
-  if (bind (sock, (struct sockaddr *) &server_name, size) < 0) {
+  // bind socket to 1985
+  socket_name.sin_family = AF_INET;
+  socket_name.sin_addr.s_addr = inet_addr("127.0.0.1");
+  socket_name.sin_port = htons(SOCKET_PORT);
+
+  if (bind (sock, (struct sockaddr *) &socket_name, sizeof(socket_name)) < 0) {
     perror ("bind");
     exit (EXIT_FAILURE);
   }
@@ -30,27 +33,29 @@ int open_local_socket(void)
 
 void *server_socket_run_loop(void *argument)
 {
-  struct sockaddr_un client_name;
-  int sockd, accepted_sockd, name_size;
-  sockd = open_local_socket();
+  struct sockaddr_in client;
+  int sockd, accepted_sockd, size;
+  sockd = open_socket();
 
   listen(sockd, BACKLOG_LEN);
-  name_size = sizeof(client_name);
-  accepted_sockd = accept(sockd, (struct sockaddr *) &client_name, (socklen_t *) &name_size);
+  size = sizeof(client);
+  accepted_sockd = accept(sockd, (struct sockaddr *) &client, (socklen_t *) &size);
   printf("socket connected\n");
-  close(sockd);
 
   if (accepted_sockd < 0)
     perror("ERROR on accept");
 
   while (accepted_sockd >= 0) {
     union SECommand command;
+    reset_sprite_engine();
 
     while (read(accepted_sockd, &command, sizeof(union SECommand)) > 0) {
-      printf("thing received\n");
+      queue_command(&command);
     }
-
+    printf("socket connection closed\n");
+    accepted_sockd = accept(sockd, (struct sockaddr *) &client, (socklen_t *) &size);
   }
+  close(sockd);
 
   return NULL;
 }

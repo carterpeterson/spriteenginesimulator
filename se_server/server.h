@@ -17,5 +17,6 @@
 // project specific
 #include "render.h"
 #include "socket.h"
+#include "sprite_engine.h"
 
 #endif
