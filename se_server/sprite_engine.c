@@ -80,18 +80,21 @@ struct SECommandListNode {
 struct SECommandListNode *command_read_list, *command_write_list;
 pthread_mutex_t command_queue_mutex;
 
+void reset_sprite_engine(void)
+{
+  // free all the things and reset the registers
+
+  // reset the memory map
+  memset(&memory, 0x00, sizeof(struct SpriteEngineMemory));
+}
+
 void init_sprite_engine(void)
 {
   command_queue_mutex = (pthread_mutex_t) PTHREAD_MUTEX_INITIALIZER;
   command_read_list = NULL;
   command_write_list = NULL;
 
-  memset(&memory, 0x00, sizeof(struct SpriteEngineMemory));
-}
-
-void reset_sprite_engine(void)
-{
-  // free all the things and reset the registers
+  reset_sprite_engine();
 }
 
 void queue_command(union SECommand *command)
@@ -105,9 +108,25 @@ void queue_command(union SECommand *command)
   pthread_mutex_unlock(&command_queue_mutex);
 }
 
+void update_pixel(uint i, uint j)
+{
+  // determine what pixel should apply
+  Pixel p;
+  p.red = 255;
+  p.green = 0;
+  p.blue = 0;
+
+  set_pixel(i, j, p);
+}
+
 void generate_frame_buffer(void)
 {
-  // do nothing for now
+  uint i, j;
+  for (j = 0; j < SPRITE_ENGINE_HEIGHT; j++) {
+    for (i = 0; i < SPRITE_ENGINE_WIDTH; i++) {
+      update_pixel(i, j);
+    }
+  }
 }
 
 void process_commands(void)

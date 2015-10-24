@@ -16,6 +16,10 @@
 
 
 // Sprite Engine Implementation Details
+#define SPRITE_ENGINE_WIDTH  640
+#define SPRITE_ENGINE_HEIGHT 480
+
+// Register defines
 #define PALETTE_COLORS      16 // 15 + Transparent
 #define INSTANCE_BASE_SIZE  64
 #define NUM_PALETTES        64
