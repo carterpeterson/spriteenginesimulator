@@ -31,7 +31,11 @@
 #define NUM_GRANDE_SPRITES  112
 #define NUM_VRENDE_SPRITES  8
 #define NUM_VENTI_SPRITES   2
+#define NUM_BACKGROUND_SPRITES 1
+#define NUM_MUNDANE_SPRITES 123
 #define NUM_INSTANCE_CHUNKS 16
+#define INSTANCE_INDEX_MIN  125
+#define INSTANCE_INDEX_MAX  139
 
 void init_sprite_engine(void);
 void reset_sprite_engine(void);
