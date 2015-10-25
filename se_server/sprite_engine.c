@@ -89,7 +89,35 @@ void reset_sprite_engine(void)
   // reset the memory map
   memset(&memory, 0x00, sizeof(struct SpriteEngineMemory));
   oam_registers = memory.grande_oam_registers;
+
+  oam_registers[0].enable = true;
+  int i = 0;
+  for (; i < GRANDE_SIZE * GRANDE_SIZE; i++) {
+    memory.grande_sprites[0].pixels[i] = 1;
+  }
+  memory.color_palettes[0].colors[1].red = 255;
+
+  memory.vrende_oam_registers[0].enable = true;
+  for (i = 0; i < VRENDE_SIZE * VRENDE_SIZE; i++) {
+    memory.vrende_sprites[0].pixels[i] = 2;
+  }
+  memory.color_palettes[0].colors[2].blue = 255;
+
+  memory.venti_oam_registers[0].enable = true;
+  for (i = 0; i < VENTI_SIZE * VENTI_SIZE; i++) {
+    memory.venti_sprites[0].pixels[i] = 3;
+  }
+  memory.color_palettes[0].colors[3].green = 255;
+
+
+  memory.background_oam_register.enable = true;
+  for (i = 0; i < BACKGROUND_WIDTH * BACKGROUND_HEIGHT; i++) {
+    memory.background_sprite.pixels[i] = 4;
+  }
+  memory.color_palettes[0].colors[4].green = 255;
+  memory.color_palettes[0].colors[4].blue = 255;
 }
+
 
 void init_sprite_engine(void)
 {
@@ -111,69 +139,104 @@ void queue_command(union SECommand *command)
   pthread_mutex_unlock(&command_queue_mutex);
 }
 
+int update_pixel_mundane(uint x, uint y)
+{
+  struct PaletteColor p;
+  uint i, sprite_x, sprite_y, color_index, palette_index, sprite_size;
+
+  for (i = 0; i < (NUM_MUNDANE_SPRITES - NUM_BACKGROUND_SPRITES); i++) {
+    sprite_size = (i < NUM_GRANDE_SPRITES) ? GRANDE_SIZE :
+      (i < (NUM_GRANDE_SPRITES + NUM_VRENDE_SPRITES)) ? VRENDE_SIZE : VENTI_SIZE;
+
+    if (oam_registers[i].enable &&
+        ((x >= oam_registers[i].x_offset) && (x < (oam_registers[i].x_offset + sprite_size))) &&
+        ((y >= oam_registers[i].y_offset) && (y < (oam_registers[i].y_offset + sprite_size)))) {
+
+      sprite_x = oam_registers[i].flip_y ? (sprite_size - (x - oam_registers[i].x_offset))
+        : (x - oam_registers[i].x_offset);
+      sprite_y = oam_registers[i].flip_x ? (sprite_size - (y - oam_registers[i].y_offset))
+        : (y - oam_registers[i].y_offset);
+      palette_index = oam_registers[i].palette;
+
+      switch(sprite_size) {
+      case(GRANDE_SIZE):
+        color_index = memory.grande_sprites[i].pixels[sprite_x + sprite_y * sprite_size];
+        if (color_index > 0) {
+          p = memory.color_palettes[palette_index].colors[color_index];
+          set_pixel(x, y, (Pixel) {p.red, p.green, p.blue});
+          return PIXEL_FOUND;
+        }
+        break;
+      case(VRENDE_SIZE):
+        color_index = memory.vrende_sprites[(i - NUM_GRANDE_SPRITES)].pixels[sprite_x + sprite_y * sprite_size];
+        if (color_index > 0) {
+          p = memory.color_palettes[palette_index].colors[color_index];
+          set_pixel(x, y, (Pixel) {p.red, p.green, p.blue});
+          return PIXEL_FOUND;
+        }
+        break;
+      case(VENTI_SIZE):
+        color_index = memory.venti_sprites[(i - (NUM_GRANDE_SPRITES + NUM_VRENDE_SPRITES))].pixels[sprite_x + sprite_y * sprite_size];
+        if (color_index > 0) {
+          p = memory.color_palettes[palette_index].colors[color_index];
+          set_pixel(x, y, (Pixel) {p.red, p.green, p.blue});
+          return PIXEL_FOUND;
+        }
+        break;
+      default:
+        // do nothing
+        break;
+      }
+    }
+  }
+
+  return NO_PIXEL_FOUND;
+}
+
+int update_pixel_instanced(uint x, uint y)
+{
+  return NO_PIXEL_FOUND;
+}
+
+void update_pixel_background(uint x, uint y)
+{
+  struct PaletteColor p;
+  uint sprite_x, sprite_y, color_index, palette_index;
+
+  if (memory.background_oam_register.enable == false) {
+    set_pixel(x, y, (Pixel) {0,0,0});
+    return;
+  }
+
+  palette_index = memory.background_oam_register.palette;
+  sprite_x = memory.background_oam_register.flip_y ? (BACKGROUND_WIDTH - x) : x;
+  sprite_x = (sprite_x + (BACKGROUND_WIDTH - memory.background_oam_register.x_offset)) % BACKGROUND_WIDTH;
+  sprite_y = memory.background_oam_register.flip_x ? (BACKGROUND_HEIGHT - y) : y;
+  sprite_y = (sprite_y + (BACKGROUND_HEIGHT - memory.background_oam_register.y_offset)) % BACKGROUND_HEIGHT;
+
+  color_index = memory.background_sprite.pixels[sprite_x + sprite_y * BACKGROUND_WIDTH];
+  p = memory.color_palettes[palette_index].colors[color_index];
+  set_pixel(x, y, (Pixel) {p.red, p.green, p.blue});
+}
+
 void update_pixel(uint x, uint y)
 {
   // determine what pixel should apply
-  struct PaletteColor p;
-  uint i, sprite_x, sprite_y, color_index, palette_index, sprite_size;
-  bool found = false;
-
-  if (memory.iprctl) {
+  if (memory.iprctl == false) {
     // check mundane
-
-    for (i = 0; i < (NUM_MUNDANE_SPRITES - NUM_BACKGROUND_SPRITES); i++) {
-      sprite_size = (i < NUM_GRANDE_SPRITES) ? GRANDE_SIZE :
-        (i < (NUM_GRANDE_SPRITES + NUM_VRENDE_SPRITES)) ? VRENDE_SIZE : VENTI_SIZE;
-
-      if (oam_registers[i].enable &&
-          ((x >= oam_registers[i].x_offset) && (x < oam_registers[i].x_offset + sprite_size)) &&
-          ((y >= oam_registers[i].y_offset) && (y < oam_registers[i].y_offset + sprite_size))) {
-
-        sprite_x = oam_registers[i].flip_x ? (sprite_size - (x - oam_registers[i].x_offset))
-          : (x - oam_registers[i].x_offset);
-        sprite_y = oam_registers[i].flip_y ? (sprite_size - (y - oam_registers[i].y_offset))
-          : (y - oam_registers[i].y_offset);
-        palette_index = oam_registers[i].palette;
-
-        switch(sprite_size) {
-        case(GRANDE_SIZE):
-          color_index = memory.grande_sprites[i].pixels[x + y * sprite_size];
-          if (color_index > 0) {
-            p = memory.color_palettes[palette_index].colors[color_index];
-            found = true;
-          }
-          break;
-        case(VRENDE_SIZE):
-          color_index = memory.vrende_sprites[(i - NUM_GRANDE_SPRITES)].pixels[x + y * sprite_size];
-          if (color_index > 0) {
-            p = memory.color_palettes[palette_index].colors[color_index];
-            found = true;
-          }
-          break;
-        case(VENTI_SIZE):
-          color_index = memory.venti_sprites[(i - (NUM_GRANDE_SPRITES + NUM_VRENDE_SPRITES))].pixels[x + y * sprite_size];
-          if (color_index > 0) {
-            p = memory.color_palettes[palette_index].colors[color_index];
-            found = true;
-          }
-          break;
-        default:
-          // do nothing
-          break;
-        }
-
-      }
-    }
-    if (found) {
-      set_pixel(x, y, (Pixel) {p.red, p.green, p.blue});
+    if (update_pixel_mundane(x, y) == PIXEL_FOUND)
       return;
-    }
     // check instanced
+    if (update_pixel_instanced(x, y) == PIXEL_FOUND)
+      return;
     // use background
+    update_pixel_background(x, y);
   } else {
-    // check instanced
-    // check mundane
-    // use background
+    if (update_pixel_instanced(x, y) == PIXEL_FOUND)
+      return;
+    if (update_pixel_mundane(x, y) == PIXEL_FOUND)
+      return;
+    update_pixel_background(x, y);
   }
 }
 

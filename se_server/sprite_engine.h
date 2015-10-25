@@ -37,6 +37,10 @@
 #define INSTANCE_INDEX_MIN  125
 #define INSTANCE_INDEX_MAX  139
 
+// reutrns
+#define PIXEL_FOUND 0
+#define NO_PIXEL_FOUND 1
+
 void init_sprite_engine(void);
 void reset_sprite_engine(void);
 void queue_command(union SECommand *command);
