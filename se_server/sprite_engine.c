@@ -88,20 +88,26 @@ void reset_sprite_engine(void)
 
   // reset the memory map
   memset(&memory, 0x00, sizeof(struct SpriteEngineMemory));
+
+  // test work
   oam_registers = memory.grande_oam_registers;
-  oam_registers[0].flip_x = true;
+  oam_registers[0].flip_y = false;
   oam_registers[0].enable = true;
+  oam_registers[0].y_offset = 200;
+  oam_registers[0].x_offset = 200;
   int i = 0, j = 0;
   for (; i < GRANDE_SIZE; i++) {
     for (j = 0; j < GRANDE_SIZE; j++) {
-      memory.grande_sprites[0].pixels[i + j*GRANDE_SIZE] = ((j*2) / GRANDE_SIZE) + 1;
+      memory.grande_sprites[0].pixels[i + j*GRANDE_SIZE] = ((i*2) / GRANDE_SIZE);
     }
   }
   memory.color_palettes[0].colors[1].red = 255;
 
   memory.vrende_oam_registers[0].enable = true;
-  for (i = 0; i < VRENDE_SIZE * VRENDE_SIZE; i++) {
-    memory.vrende_sprites[0].pixels[i] = 2;
+  for (; i < VRENDE_SIZE; i++) {
+    for (j = 0; j < VRENDE_SIZE; j++) {
+      memory.vrende_sprites[0].pixels[i + j*VRENDE_SIZE] = ((i*2) / VRENDE_SIZE) + 1;
+    }
   }
   memory.color_palettes[0].colors[2].blue = 255;
 
@@ -115,8 +121,8 @@ void reset_sprite_engine(void)
   memory.instance_oam_registers[0].x_offset = 200;
   memory.instance_oam_registers[0].y_offset = 200;
   memory.instance_oam_registers[0].sprite_size = INSTANCE_SIZE_256x128;
-  memory.instance_oam_registers[0].transpose = true;
-  memory.instance_oam_registers[0].flip_y = true;
+  //memory.instance_oam_registers[0].transpose = true;
+  memory.instance_oam_registers[0].flip_x = true;
   int chunk = 0;
   for (; chunk < 4; chunk++){
     for (i = 0; i < (INSTANCE_BASE_SIZE * INSTANCE_BASE_SIZE); i++) {
@@ -162,8 +168,8 @@ int update_pixel_mundane(uint x, uint y)
 {
   struct PaletteColor p;
   uint i, sprite_x, sprite_y, color_index, palette_index, sprite_size;
-
-  for (i = 0; i < (NUM_MUNDANE_SPRITES - NUM_BACKGROUND_SPRITES); i++) {
+  i = 0;
+  while (i < (NUM_MUNDANE_SPRITES - NUM_BACKGROUND_SPRITES)) {
     sprite_size = (i < NUM_GRANDE_SPRITES) ? GRANDE_SIZE :
       (i < (NUM_GRANDE_SPRITES + NUM_VRENDE_SPRITES)) ? VRENDE_SIZE : VENTI_SIZE;
 
@@ -207,6 +213,26 @@ int update_pixel_mundane(uint x, uint y)
         break;
       }
     }
+    switch(i) {
+    case 55:
+      i = 112;
+      break;
+    case 115:
+      i = 120;
+      break;
+    case 120:
+      i = 56;
+      break;
+    case 111:
+      i = 116;
+      break;
+    case 119:
+      i = 121;
+      break;
+    default:
+      i++;
+      break;
+    };
   }
 
   return NO_PIXEL_FOUND;
@@ -366,13 +392,29 @@ void process_commands(void)
     switch (command->type) {
     case UPDATE_OAM :
       if (command->update_oam.oam_index < NUM_MUNDANE_SPRITES) {
-        // Update mundane sprite
+        oam_registers[command->update_oam.oam_index].enable = command->update_oam.enable;
+        oam_registers[command->update_oam.oam_index].palette = command->update_oam.palette;
+        oam_registers[command->update_oam.oam_index].flip_x = command->update_oam.flip_x;
+        oam_registers[command->update_oam.oam_index].flip_y = command->update_oam.flip_y;
+        oam_registers[command->update_oam.oam_index].x_offset = command->update_oam.x_offset;
+        oam_registers[command->update_oam.oam_index].y_offset = command->update_oam.y_offset;
       } else if (command->update_oam.oam_index >= INSTANCE_INDEX_MIN && command->update_oam.oam_index < INSTANCE_INDEX_MAX) {
         // update instace sprite
+        uint oam_index = command->update_oam.oam_index - INSTANCE_INDEX_MIN;
+        memory.instance_oam_registers[oam_index].enable = command->update_oam.enable;
+        memory.instance_oam_registers[oam_index].palette = command->update_oam.palette;
+        memory.instance_oam_registers[oam_index].flip_x = command->update_oam.flip_x;
+        memory.instance_oam_registers[oam_index].flip_y = command->update_oam.flip_y;
+        memory.instance_oam_registers[oam_index].x_offset = command->update_oam.x_offset;
+        memory.instance_oam_registers[oam_index].y_offset = command->update_oam.y_offset;
+        memory.instance_oam_registers[oam_index].sprite_size = command->update_oam.sprite_size;
+        memory.instance_oam_registers[oam_index].sprite = command->update_oam.sprite;
+        memory.instance_oam_registers[oam_index].transpose = command->update_oam.transpose;
       }
       // do nothing otherwise
       break;
     case(SET_PRIORITY_CTRL):
+      memory.iprctl = command->set_priority_control.iprctl;
       break;
     case(UPDATE_CRAM):
       break;
