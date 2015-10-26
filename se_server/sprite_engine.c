@@ -89,11 +89,13 @@ void reset_sprite_engine(void)
   // reset the memory map
   memset(&memory, 0x00, sizeof(struct SpriteEngineMemory));
   oam_registers = memory.grande_oam_registers;
-
+  oam_registers[0].flip_x = true;
   oam_registers[0].enable = true;
-  int i = 0;
-  for (; i < GRANDE_SIZE * GRANDE_SIZE; i++) {
-    memory.grande_sprites[0].pixels[i] = 1;
+  int i = 0, j = 0;
+  for (; i < GRANDE_SIZE; i++) {
+    for (j = 0; j < GRANDE_SIZE; j++) {
+      memory.grande_sprites[0].pixels[i + j*GRANDE_SIZE] = ((j*2) / GRANDE_SIZE) + 1;
+    }
   }
   memory.color_palettes[0].colors[1].red = 255;
 
@@ -113,14 +115,19 @@ void reset_sprite_engine(void)
   memory.instance_oam_registers[0].x_offset = 200;
   memory.instance_oam_registers[0].y_offset = 200;
   memory.instance_oam_registers[0].sprite_size = INSTANCE_SIZE_256x128;
+  memory.instance_oam_registers[0].transpose = true;
+  memory.instance_oam_registers[0].flip_y = true;
   int chunk = 0;
-  for (; chunk < 16; chunk++){
+  for (; chunk < 4; chunk++){
     for (i = 0; i < (INSTANCE_BASE_SIZE * INSTANCE_BASE_SIZE); i++) {
-      memory.instance_chunks[chunk].pixel[i] = 5;
+      memory.instance_chunks[chunk].pixel[i] = 5 + (chunk % 2);
     }
   }
   memory.color_palettes[0].colors[5].red = 255;
   memory.color_palettes[0].colors[5].blue = 255;
+
+  memory.color_palettes[0].colors[6].red = 255;
+  memory.color_palettes[0].colors[6].green = 255;
 
   memory.background_oam_register.enable = true;
   for (i = 0; i < BACKGROUND_WIDTH * BACKGROUND_HEIGHT; i++) {
@@ -240,6 +247,12 @@ int update_pixel_instanced(uint x, uint y)
       sprite_size_y = 0;
     }
 
+    if (memory.instance_oam_registers[i].transpose) {
+      uint temp = sprite_size_x;
+      sprite_size_x = sprite_size_y;
+      sprite_size_y = temp;
+    }
+
     if ((x < memory.instance_oam_registers[i].x_offset) ||
         (x >= (memory.instance_oam_registers[i].x_offset + sprite_size_x)) ||
         (y < memory.instance_oam_registers[i].y_offset) ||
@@ -247,6 +260,13 @@ int update_pixel_instanced(uint x, uint y)
       continue;
     sprite_x = x - memory.instance_oam_registers[i].x_offset;
     sprite_y = y - memory.instance_oam_registers[i].y_offset;
+    sprite_x = (memory.instance_oam_registers[i].flip_y) ? (sprite_size_x - sprite_x) : sprite_x;
+    sprite_y = (memory.instance_oam_registers[i].flip_x) ? (sprite_size_y - sprite_y) : sprite_y;
+    if (memory.instance_oam_registers[i].transpose) {
+      uint temp = sprite_x;
+      sprite_x = sprite_y;
+      sprite_y = temp;
+    }
 
     // calculate possible vram addr
     possible_vram_addr = memory.instance_oam_registers[i].sprite * (INSTANCE_BASE_SIZE * INSTANCE_BASE_SIZE);
