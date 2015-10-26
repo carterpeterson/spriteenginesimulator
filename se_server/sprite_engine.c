@@ -377,7 +377,7 @@ void generate_frame_buffer(void)
 
 void process_commands(void)
 {
-  struct SECommandListNode *temp;
+  struct SECommandListNode *temp, *free_node;
   union SECommand *command;
 
   // swap buffers
@@ -417,15 +417,61 @@ void process_commands(void)
       memory.iprctl = command->set_priority_control.iprctl;
       break;
     case(UPDATE_CRAM):
+      memory.color_palettes[command->update_cram.cram_index].colors[command->update_cram.palette_index] =
+        (struct PaletteColor) {command->update_cram.red, command->update_cram.green, command->update_cram.blue};
       break;
     case(UPDATE_VRAM):
-      break;
+      {
+        uint chunk_index = command->update_vram.chunk;
+        uint pixel_x = command->update_vram.pixel_x;
+        uint pixel_y = command->update_vram.pixel_y;
+        if (command->update_vram.chunk < VRAM_CHUNK_GRANDE_BASE) { // INSTANCE CHUNKS
+          memory.instance_chunks[chunk_index].pixel[pixel_x + pixel_y * INSTANCE_BASE_SIZE]
+            = command->update_vram.p_data;
+        } else if (command->update_vram.chunk < VRAM_CHUNK_VRENDE_BASE) { // GRANDE CHUNKS
+          chunk_index -= VRAM_CHUNK_GRANDE_BASE;
+          memory.grande_sprites[chunk_index].pixels[pixel_x + pixel_y * GRANDE_SIZE]
+            = command->update_vram.p_data;
+        } else if (command->update_vram.chunk < VRAM_CHUNK_VENTI_BASE) { // VRENDE CHUNKS
+          chunk_index -= VRAM_CHUNK_VRENDE_BASE;
+          memory.vrende_sprites[chunk_index / 4]
+            .pixels[((chunk_index % 4) / 2) * (2 * GRANDE_SIZE * GRANDE_SIZE)
+                    + (chunk_index % 2) * GRANDE_SIZE // align to the 0,0
+                    + (pixel_y * 2 * GRANDE_SIZE)
+                    + pixel_x] = command->update_vram.p_data;
+        } else if (command->update_vram.chunk < VRAM_CHUNK_BACKGROUND_BASE) { // VENTI CHUNKS
+          chunk_index -= VRAM_CHUNK_VENTI_BASE;
+          memory.vrende_sprites[chunk_index / 16]
+            .pixels[((chunk_index % 16) / 4) * (4 * GRANDE_SIZE * GRANDE_SIZE)
+                    + (chunk_index % 4) * GRANDE_SIZE
+                    + (pixel_y * 4 * GRANDE_SIZE)
+                    + pixel_x] = command->update_vram.p_data;
+        } else if (command->update_vram.chunk < VRAM_CHUNK_BACKGROUND_MAX) { // BACKGROUND CHUNKS
+          chunk_index -= VRAM_CHUNK_BACKGROUND_BASE;
+          if (chunk_index < 70) {
+            memory.background_sprite.pixels[(chunk_index / 10) * BACKGROUND_WIDTH * GRANDE_SIZE
+                                            + (chunk_index % 10) * GRANDE_SIZE
+                                            + pixel_y * BACKGROUND_WIDTH
+                                            + pixel_x] = command->update_vram.p_data;
+          } else {
+            memory.background_sprite.pixels[(chunk_index / 10) * BACKGROUND_WIDTH * GRANDE_SIZE
+                                            + (chunk_index % 5) * 2 * GRANDE_SIZE
+                                            + pixel_y * BACKGROUND_WIDTH
+                                            + ((pixel_y > (GRANDE_SIZE / 2))
+                                               ? (BACKGROUND_WIDTH - ((GRANDE_SIZE / 2) * BACKGROUND_WIDTH)) : 0)
+                                            + pixel_x] = command->update_vram.p_data;
+          }
+        } // else do nothing
+        break;
+      }
     default:
       // Do nothing
       break;
     }
 
+    free_node = command_read_list;
     command_read_list = command_read_list->next_node;
+    free(free_node);
   }
 
   generate_frame_buffer();
