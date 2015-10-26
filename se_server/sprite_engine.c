@@ -88,10 +88,10 @@ void reset_sprite_engine(void)
 
   // reset the memory map
   memset(&memory, 0x00, sizeof(struct SpriteEngineMemory));
+  oam_registers = memory.grande_oam_registers;
 
   // test work
-  oam_registers = memory.grande_oam_registers;
-  oam_registers[0].flip_y = false;
+  /*oam_registers[0].flip_y = false;
   oam_registers[0].enable = true;
   oam_registers[0].y_offset = 200;
   oam_registers[0].x_offset = 200;
@@ -136,11 +136,11 @@ void reset_sprite_engine(void)
   memory.color_palettes[0].colors[6].green = 255;
 
   memory.background_oam_register.enable = true;
-  for (i = 0; i < BACKGROUND_WIDTH * BACKGROUND_HEIGHT; i++) {
+  for (i = 0; i < BACKGROUND_WIDTH; i++) {
     memory.background_sprite.pixels[i] = 4;
   }
   memory.color_palettes[0].colors[4].green = 255;
-  memory.color_palettes[0].colors[4].blue = 255;
+  memory.color_palettes[0].colors[4].blue = 255;*/
 }
 
 
@@ -454,12 +454,15 @@ void process_commands(void)
                                             + pixel_y * BACKGROUND_WIDTH
                                             + pixel_x] = command->update_vram.p_data;
           } else {
-            memory.background_sprite.pixels[(chunk_index / 10) * BACKGROUND_WIDTH * GRANDE_SIZE
-                                            + (chunk_index % 5) * 2 * GRANDE_SIZE
-                                            + pixel_y * BACKGROUND_WIDTH
-                                            + ((pixel_y > (GRANDE_SIZE / 2))
-                                               ? (BACKGROUND_WIDTH - ((GRANDE_SIZE / 2) * BACKGROUND_WIDTH)) : 0)
-                                            + pixel_x] = command->update_vram.p_data;
+            uint pixel_index = (chunk_index / 10) * BACKGROUND_WIDTH * GRANDE_SIZE
+              + (chunk_index % 5) * 2 * GRANDE_SIZE
+              + pixel_y * BACKGROUND_WIDTH
+              + pixel_x;
+            if (pixel_y >= (GRANDE_SIZE / 2)) {
+              pixel_index -= (GRANDE_SIZE / 2) * BACKGROUND_WIDTH;
+              pixel_index += GRANDE_SIZE;
+            }
+            memory.background_sprite.pixels[pixel_index] = command->update_vram.p_data;
           }
         } // else do nothing
         break;
