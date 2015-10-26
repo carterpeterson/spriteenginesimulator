@@ -57,7 +57,7 @@ struct SpriteEngineMemory {
   struct SpriteOAMRegisterMundane vrende_oam_registers[NUM_VRENDE_SPRITES];
   struct SpriteOAMRegisterMundane venti_oam_registers[NUM_VENTI_SPRITES];
   struct SpriteOAMRegisterMundane background_oam_register;
-  struct SpriteOAMRegisterInstance instance_oam_registers[NUM_INSTANCE_CHUNKS];
+  struct SpriteOAMRegisterInstance instance_oam_registers[NUM_INSTANCE_SPRITES];
   bool iprctl;
 
   // VRAM
@@ -109,6 +109,18 @@ void reset_sprite_engine(void)
   }
   memory.color_palettes[0].colors[3].green = 255;
 
+  memory.instance_oam_registers[0].enable = true;
+  memory.instance_oam_registers[0].x_offset = 200;
+  memory.instance_oam_registers[0].y_offset = 200;
+  memory.instance_oam_registers[0].sprite_size = INSTANCE_SIZE_256x128;
+  int chunk = 0;
+  for (; chunk < 16; chunk++){
+    for (i = 0; i < (INSTANCE_BASE_SIZE * INSTANCE_BASE_SIZE); i++) {
+      memory.instance_chunks[chunk].pixel[i] = 5;
+    }
+  }
+  memory.color_palettes[0].colors[5].red = 255;
+  memory.color_palettes[0].colors[5].blue = 255;
 
   memory.background_oam_register.enable = true;
   for (i = 0; i < BACKGROUND_WIDTH * BACKGROUND_HEIGHT; i++) {
@@ -195,6 +207,73 @@ int update_pixel_mundane(uint x, uint y)
 
 int update_pixel_instanced(uint x, uint y)
 {
+  struct PaletteColor p;
+  bool found = false;
+  uint i;
+  uint sprite_x, sprite_y;
+  uint color_index, palette_index, vram_addr = MAX_VRAM_ADDR, possible_vram_addr, oam_index;
+  uint sprite_size_x, sprite_size_y;
+
+  for (i = 0; i < NUM_INSTANCE_SPRITES; i++) {
+    if (memory.instance_oam_registers[i].enable == false)
+      continue;
+
+    switch(memory.instance_oam_registers[i].sprite_size) {
+    case (INSTANCE_SIZE_64x64):
+      sprite_size_x = 64;
+      sprite_size_y = 64;
+      break;
+    case (INSTANCE_SIZE_128x64):
+      sprite_size_x = 128;
+      sprite_size_y = 64;
+      break;
+    case (INSTANCE_SIZE_128x128):
+      sprite_size_x = 128;
+      sprite_size_y = 128;
+      break;
+    case (INSTANCE_SIZE_256x128):
+      sprite_size_x = 256;
+      sprite_size_y = 128;
+      break;
+    default:
+      sprite_size_x = 0;
+      sprite_size_y = 0;
+    }
+
+    if ((x < memory.instance_oam_registers[i].x_offset) ||
+        (x >= (memory.instance_oam_registers[i].x_offset + sprite_size_x)) ||
+        (y < memory.instance_oam_registers[i].y_offset) ||
+        (y >= (memory.instance_oam_registers[i].y_offset + sprite_size_y)))
+      continue;
+    sprite_x = x - memory.instance_oam_registers[i].x_offset;
+    sprite_y = y - memory.instance_oam_registers[i].y_offset;
+
+    // calculate possible vram addr
+    possible_vram_addr = memory.instance_oam_registers[i].sprite * (INSTANCE_BASE_SIZE * INSTANCE_BASE_SIZE);
+    possible_vram_addr += (sprite_x / INSTANCE_BASE_SIZE) * (INSTANCE_BASE_SIZE * INSTANCE_BASE_SIZE);
+    possible_vram_addr += (sprite_y / INSTANCE_BASE_SIZE) * 4 * (INSTANCE_BASE_SIZE * INSTANCE_BASE_SIZE);
+    possible_vram_addr += ((sprite_x % INSTANCE_BASE_SIZE) + (sprite_y % INSTANCE_BASE_SIZE) * INSTANCE_BASE_SIZE);
+
+    if (possible_vram_addr < vram_addr) {
+      vram_addr = possible_vram_addr;
+      oam_index = i;
+      palette_index = memory.instance_oam_registers[i].palette;
+      color_index = *(&(memory.instance_chunks[0].pixel[0]) + possible_vram_addr);
+      found = true;
+    } else if (possible_vram_addr == vram_addr && i < oam_index) {
+      oam_index = i;
+      palette_index = memory.instance_oam_registers[i].palette;
+      color_index = *(&(memory.instance_chunks[0].pixel[0]) + possible_vram_addr);
+      found = true;
+    }
+  }
+
+  if (found && color_index > 0) {
+    p = memory.color_palettes[palette_index].colors[color_index];
+    set_pixel(x, y, (Pixel) {p.red, p.green, p.blue});
+    return PIXEL_FOUND;
+  }
+
   return NO_PIXEL_FOUND;
 }
 
