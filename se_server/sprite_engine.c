@@ -107,7 +107,7 @@ void reset_sprite_engine(void)
   oam_registers = memory.grande_oam_registers;
 
   // test work
-  oam_registers[0].flip_x = true;
+  //oam_registers[0].flip_x = true;
   oam_registers[0].enable = true;
   oam_registers[0].y_offset = 200;
   oam_registers[0].x_offset = 200;
@@ -173,14 +173,20 @@ void init_sprite_engine(void)
   reset_sprite_engine();
 }
 
+struct SECommandListNode *tail_node_write;
 void queue_command(union SECommand *command)
 {
   struct SECommandListNode *new_node = malloc(sizeof(struct SECommandListNode));
   memcpy(&(new_node->command), command, sizeof(union SECommand));
+  new_node->next_node = NULL;
 
   pthread_mutex_lock(&command_queue_mutex);
-  new_node->next_node = command_write_list;
-  command_write_list = new_node;
+  if (command_write_list == NULL) {
+    command_write_list = new_node;
+  } else {
+    tail_node_write->next_node = new_node;
+  }
+  tail_node_write = new_node;
   pthread_mutex_unlock(&command_queue_mutex);
 }
 
@@ -522,18 +528,20 @@ void draw_instance_sprites(void)
 
 void draw_background(void)
 {
-  uint x, y, sprite_x, sprite_y;
+  uint x, y, frame_x, frame_y, x_offset, y_offset;
+  x_offset = memory.background_oam_register.x_offset;
+  y_offset = memory.background_oam_register.y_offset;
 
   for (x = 0; x < BACKGROUND_WIDTH; x++) {
     for (y=0; y < BACKGROUND_HEIGHT; y++) {
-      sprite_x = memory.background_oam_register.flip_y ? (BACKGROUND_WIDTH - x) : x;
-      sprite_x = (sprite_x + (BACKGROUND_WIDTH - memory.background_oam_register.x_offset)) % BACKGROUND_WIDTH;
-      sprite_y = memory.background_oam_register.flip_x ? (BACKGROUND_HEIGHT - y) : y;
-      sprite_y = (sprite_y + (BACKGROUND_HEIGHT - memory.background_oam_register.y_offset)) % BACKGROUND_HEIGHT;
+      frame_x = (memory.background_oam_register.flip_y ? (BACKGROUND_WIDTH - x) : x) + x_offset;
+      frame_x = frame_x % BACKGROUND_WIDTH;
+      frame_y = (memory.background_oam_register.flip_x ? (BACKGROUND_HEIGHT - y) : y) + y_offset;
+      frame_y = frame_y % BACKGROUND_HEIGHT;
 
-      display_color_mapping.color_mappings[sprite_x + sprite_y * BACKGROUND_WIDTH].color_index =
-        memory.background_sprite.pixels[sprite_x + sprite_y * BACKGROUND_WIDTH];
-      display_color_mapping.color_mappings[sprite_x + sprite_y * BACKGROUND_WIDTH].palette_index =
+      display_color_mapping.color_mappings[frame_x + frame_y * BACKGROUND_WIDTH].color_index =
+        memory.background_sprite.pixels[x + y * BACKGROUND_WIDTH];
+      display_color_mapping.color_mappings[frame_x + frame_y * BACKGROUND_WIDTH].palette_index =
         memory.background_oam_register.palette;
     }
   }
@@ -575,6 +583,7 @@ void process_commands(void)
   temp = command_read_list;
   command_read_list = command_write_list;
   command_write_list = temp;
+  tail_node_write = NULL;
   pthread_mutex_unlock(&command_queue_mutex);
 
   while (command_read_list != NULL) {

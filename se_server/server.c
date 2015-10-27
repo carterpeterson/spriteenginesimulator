@@ -11,6 +11,7 @@ int main(void)
 
   for (;;) {
     // wait here plz
+    //usleep(16666);
     gettimeofday(&start_tv,NULL);
     process_commands();
     render();
