@@ -52,6 +52,9 @@ struct ColorPalette {
 };
 
 struct SpriteEngineMemory {
+  // CPU Saving flags
+  bool active_mundane, active_instance;
+
   // OAM Registers
   struct SpriteOAMRegisterMundane grande_oam_registers[NUM_GRANDE_SPRITES];
   struct SpriteOAMRegisterMundane vrende_oam_registers[NUM_VRENDE_SPRITES];
@@ -79,7 +82,19 @@ struct SECommandListNode {
   struct SECommandListNode *next_node;
 };
 
+struct ColorMapping {
+  uint8_t palette_index;
+  uint8_t color_index;
+};
+
+struct DisplayColorMapping {
+  struct ColorMapping color_mappings[SPRITE_ENGINE_WIDTH * SPRITE_ENGINE_HEIGHT];
+};
+
 struct SECommandListNode *command_read_list, *command_write_list;
+struct DisplayColorMapping display_color_mapping;
+struct DisplayColorMapping instance_color_mapping;
+uint8_t instance_vram_read_chunk[SPRTIE_ENGINE_WIDTH * SPRITE_ENGINE_HEIGHT];
 pthread_mutex_t command_queue_mutex;
 
 void reset_sprite_engine(void)
@@ -88,17 +103,18 @@ void reset_sprite_engine(void)
 
   // reset the memory map
   memset(&memory, 0x00, sizeof(struct SpriteEngineMemory));
+  memset(&display_color_mapping, 0x00, sizeof(struct DisplayColorMapping));
   oam_registers = memory.grande_oam_registers;
 
   // test work
-  /*oam_registers[0].flip_y = false;
+  oam_registers[0].flip_x = true;
   oam_registers[0].enable = true;
   oam_registers[0].y_offset = 200;
   oam_registers[0].x_offset = 200;
   int i = 0, j = 0;
   for (; i < GRANDE_SIZE; i++) {
     for (j = 0; j < GRANDE_SIZE; j++) {
-      memory.grande_sprites[0].pixels[i + j*GRANDE_SIZE] = ((i*2) / GRANDE_SIZE);
+      memory.grande_sprites[0].pixels[i + j*GRANDE_SIZE] = ((j*2) / GRANDE_SIZE);
     }
   }
   memory.color_palettes[0].colors[1].red = 255;
@@ -136,11 +152,15 @@ void reset_sprite_engine(void)
   memory.color_palettes[0].colors[6].green = 255;
 
   memory.background_oam_register.enable = true;
-  for (i = 0; i < BACKGROUND_WIDTH; i++) {
+  for (i = 0; i < BACKGROUND_WIDTH * BACKGROUND_HEIGHT; i++) {
     memory.background_sprite.pixels[i] = 4;
   }
   memory.color_palettes[0].colors[4].green = 255;
-  memory.color_palettes[0].colors[4].blue = 255;*/
+  memory.color_palettes[0].colors[4].blue = 255;
+
+  for (i = 0; i < (NUM_MUNDANE_SPRITES - NUM_BACKGROUND_SPRITES); i++) {
+    oam_registers[i].enable = true;
+  }
 }
 
 
@@ -349,28 +369,179 @@ void update_pixel(uint x, uint y)
   // determine what pixel should apply
   if (memory.iprctl == false) {
     // check mundane
-    if (update_pixel_mundane(x, y) == PIXEL_FOUND)
+    if (memory.active_mundane && update_pixel_mundane(x, y) == PIXEL_FOUND)
       return;
     // check instanced
-    if (update_pixel_instanced(x, y) == PIXEL_FOUND)
+    if (memory.active_instance && update_pixel_instanced(x, y) == PIXEL_FOUND)
       return;
     // use background
     update_pixel_background(x, y);
   } else {
-    if (update_pixel_instanced(x, y) == PIXEL_FOUND)
+    if (memory.active_instance && update_pixel_instanced(x, y) == PIXEL_FOUND)
       return;
-    if (update_pixel_mundane(x, y) == PIXEL_FOUND)
+    if (memory.active_mundane && update_pixel_mundane(x, y) == PIXEL_FOUND)
       return;
     update_pixel_background(x, y);
   }
 }
 
+void draw_mundane_sprites(void)
+{
+  int i, sprite_x, sprite_y, color_index, x_offset, y_offset, sprite_size, frame_x, frame_y;
+  uint8_t *pixels;
+  i = (NUM_MUNDANE_SPRITES - NUM_BACKGROUND_SPRITES) - 1;
+
+  for(; i >= 0; i--) {
+    if (oam_registers[i].enable == false)
+      continue;
+
+    sprite_size = (i < NUM_GRANDE_SPRITES) ? GRANDE_SIZE :
+      (i < (NUM_GRANDE_SPRITES + NUM_VRENDE_SPRITES)) ? VRENDE_SIZE : VENTI_SIZE;
+    x_offset = oam_registers[i].x_offset;
+    y_offset = oam_registers[i].y_offset;
+    switch(sprite_size) {
+        case(GRANDE_SIZE):
+          pixels = &(memory.grande_sprites[i].pixels[0]);
+          break;
+        case(VRENDE_SIZE):
+          pixels = &(memory.vrende_sprites[(i - NUM_GRANDE_SPRITES)].pixels[0]);
+          break;
+        case(VENTI_SIZE):
+          pixels = &(memory.venti_sprites[(i - (NUM_GRANDE_SPRITES + NUM_VRENDE_SPRITES))].pixels[0]);
+          break;
+        default:
+          // do nothing
+          break;
+        }
+
+    for (sprite_x = 0; sprite_x < sprite_size; sprite_x++) {
+      frame_x = (sprite_x + x_offset);
+      if (frame_x >= SPRITE_ENGINE_WIDTH)
+        break;
+
+      for (sprite_y = 0; sprite_y < sprite_size; sprite_y++) {
+        frame_y = (sprite_y + y_offset);
+        if(frame_y >= SPRITE_ENGINE_HEIGHT)
+          break;
+
+        color_index = pixels[((oam_registers[i].flip_y) ? (sprite_size - sprite_x) : sprite_x)
+                             + ((oam_registers[i].flip_x) ? (sprite_size - sprite_y) : sprite_y) * sprite_size];
+        if (color_index > 0) {
+          display_color_mapping.color_mappings[frame_x + frame_y * BACKGROUND_WIDTH].color_index = color_index;
+          display_color_mapping.color_mappings[frame_x + frame_y * BACKGROUND_WIDTH].palette_index =
+            oam_registers[i].palette;
+        }
+      }
+    }
+  }
+}
+
+void draw_instance_sprites(void)
+{
+  int i, sprite_x, sprite_y;
+  int color_index, x_offset, y_offset;
+  int sprite_size_x, sprite_size_y, frame_x, frame_y;
+  uint8_t *pixels;
+
+  // reset the chunk array && color mapping
+  for (i = 0; i < SPRITE_ENGINE_WIDTH * SPRITE_ENGINE_HEIGHT; i++) {
+    instance_vram_read_chunk[i] = 0xFF;
+    instance_color_mapping[i].palette_index = 0;
+    instance_color_mapping[i].color_index = 0;
+  }
+
+  i = NUM_INSTANCE_SPRITES - 1;
+  for (i; i >= 0; i--) {
+    if (memory.instance_oam_registers[i].enable == false)
+      continue;
+
+    switch(memory.instance_oam_registers[i].sprite_size) {
+    case (INSTANCE_SIZE_64x64):
+      sprite_size_x = 64;
+      sprite_size_y = 64;
+      break;
+    case (INSTANCE_SIZE_128x64):
+      sprite_size_x = 128;
+      sprite_size_y = 64;
+      break;
+    case (INSTANCE_SIZE_128x128):
+      sprite_size_x = 128;
+      sprite_size_y = 128;
+      break;
+    case (INSTANCE_SIZE_256x128):
+      sprite_size_x = 256;
+      sprite_size_y = 128;
+      break;
+    default:
+      sprite_size_x = 0;
+      sprite_size_y = 0;
+    }
+    x_offset = memory.instance_oam_registers[i].x_offset;
+    y_offset = memory.instance_oam_registers[i].y_offset;
+
+    for (sprite_x = 0; sprite_x < sprite_size; sprite_x++) {
+      frame_x = (sprite_x + x_offset);
+      if (frame_x >= SPRITE_ENGINE_WIDTH)
+        break;
+
+      for (sprite_y = 0; sprite_y < sprite_size; sprite_y++) {
+        frame_y = (sprite_y + y_offset);
+        if(frame_y >= SPRITE_ENGINE_HEIGHT)
+          break;
+
+        color_index = pixels[((oam_registers[i].flip_y) ? (sprite_size - sprite_x) : sprite_x)
+                             + ((oam_registers[i].flip_x) ? (sprite_size - sprite_y) : sprite_y) * sprite_size];
+        if (color_index > 0) {
+          display_color_mapping.color_mappings[frame_x + frame_y * BACKGROUND_WIDTH].color_index = color_index;
+          display_color_mapping.color_mappings[frame_x + frame_y * BACKGROUND_WIDTH].palette_index =
+            oam_registers[i].palette;
+        }
+      }
+    }
+  }
+}
+
+void draw_background(void)
+{
+  uint x, y, sprite_x, sprite_y;
+
+  for (x = 0; x < BACKGROUND_WIDTH; x++) {
+    for (y=0; y < BACKGROUND_HEIGHT; y++) {
+      sprite_x = memory.background_oam_register.flip_y ? (BACKGROUND_WIDTH - x) : x;
+      sprite_x = (sprite_x + (BACKGROUND_WIDTH - memory.background_oam_register.x_offset)) % BACKGROUND_WIDTH;
+      sprite_y = memory.background_oam_register.flip_x ? (BACKGROUND_HEIGHT - y) : y;
+      sprite_y = (sprite_y + (BACKGROUND_HEIGHT - memory.background_oam_register.y_offset)) % BACKGROUND_HEIGHT;
+
+      display_color_mapping.color_mappings[sprite_x + sprite_y * BACKGROUND_WIDTH].color_index =
+        memory.background_sprite.pixels[sprite_x + sprite_y * BACKGROUND_WIDTH];
+      display_color_mapping.color_mappings[sprite_x + sprite_y * BACKGROUND_WIDTH].palette_index =
+        memory.background_oam_register.palette;
+    }
+  }
+}
+
+
 void generate_frame_buffer(void)
 {
-  uint x, y;
-  for (y = 0; y < SPRITE_ENGINE_HEIGHT; y++) {
-    for (x = 0; x < SPRITE_ENGINE_WIDTH; x++) {
-      update_pixel(x, y);
+  struct PaletteColor p;
+  uint x, y, palette_index, color_index;
+
+  draw_background();
+  if(memory.iprctl) {
+    draw_mundane_sprites();
+    draw_instance_sprites();
+  } else {
+    draw_instance_sprites();
+    draw_mundane_sprites();
+  }
+
+  // set all the pixels
+  for (x = 0; x < SPRITE_ENGINE_WIDTH; x++) {
+    for (y = 0; y < SPRITE_ENGINE_HEIGHT; y++) {
+      color_index = display_color_mapping.color_mappings[x + y * BACKGROUND_WIDTH].color_index;
+      palette_index = display_color_mapping.color_mappings[x + y * BACKGROUND_WIDTH].palette_index;
+      p = memory.color_palettes[palette_index].colors[color_index];
+      set_pixel(x, y, (Pixel) {p.red, p.green, p.blue});
     }
   }
 }

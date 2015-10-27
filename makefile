@@ -1,7 +1,7 @@
 # setup
 BUILD_DIR:=$(CURDIR)
 CC=gcc
-CFLAGS=-Wall -lpthread -g -I /opt/X11/include -L /opt/X11/lib/ -lX11 -lm
+CFLAGS=-Wall -lpthread -g -I /opt/X11/include -L /opt/X11/lib/ -lX11 -lm -O3
 TARGET=server
 DEBUG_DEFINES=-D DEBUG_PRINT
 
