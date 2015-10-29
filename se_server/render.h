@@ -2,9 +2,8 @@
 #define SESIMULATOR_SESERVER_RENDER_H
 
 /* X library headers */
-#include <X11/Xlib.h>
-#include <X11/Xutil.h>
-#include <X11/Xos.h>
+#include <OpenGL/gl.h>
+#include <GLUT/glut.h>
 
 /* Normal C Headers */
 #include <stdio.h>
@@ -27,8 +26,7 @@ typedef struct {
 } Pixel;
 
 extern Pixel *frame_buffer;
-extern Display *dis;
-extern int width, height, pixel_width, pixel_height;
+//extern int width, height, pixel_width, pixel_height;
 extern pthread_mutex_t frame_buffer_lock;
 extern bool render_flag;
 

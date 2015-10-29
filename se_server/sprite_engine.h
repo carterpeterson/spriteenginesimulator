@@ -8,12 +8,14 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <unistd.h>
+#include <string.h>
 #include <pthread.h>
 
 // project specific includes
 #include "render.h"
 #include "sprite_engine_commands.h"
 
+typedef unsigned int uint;
 
 // Sprite Engine Implementation Details
 #define SPRITE_ENGINE_WIDTH  640
