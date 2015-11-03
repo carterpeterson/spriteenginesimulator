@@ -1,8 +1,21 @@
 #include "socket.h"
 
-pthread_t server_socket_thread;
+pthread_t display_command_socket_thread;
+pthread_t display_sync_socket_thread;
 
-int open_socket(void)
+struct SocketLoopArgs {
+  uint16_t socket_port;
+  uint16_t packet_size;
+  void (*new_connection_delegate)(void);
+  void (*packet_received_delegate)(void *);
+};
+
+void command_socket_new_connection_delegate(void);
+void command_socket_packet_received_delegate(void *command);
+void vsync_socket_new_connection_delegate(void);
+void vsync_socket_packet_received_delegate(void *command);
+
+int open_socket(uint16_t socket_port)
 {
   struct sockaddr_in socket_name;
   int sock;
@@ -18,11 +31,10 @@ int open_socket(void)
   if (setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &(int){ 1 }, sizeof(int)) < 0)
     perror("setsockopt(SO_REUSEADDR) failed");
 
-  // bind socket to 1985
+  // bind to socket
   socket_name.sin_family = AF_INET;
   socket_name.sin_addr.s_addr = inet_addr("127.0.0.1");
-  socket_name.sin_port = htons(SOCKET_PORT);
-
+  socket_name.sin_port = htons(socket_port);
   if (bind (sock, (struct sockaddr *) &socket_name, sizeof(socket_name)) < 0) {
     perror ("bind");
     exit (EXIT_FAILURE);
@@ -31,36 +43,76 @@ int open_socket(void)
   return sock;
 }
 
-void *server_socket_run_loop(void *argument)
+void *socket_run_loop(void *argument)
 {
   struct sockaddr_in client;
   int sockd, accepted_sockd, size;
-  sockd = open_socket();
+  struct SocketLoopArgs *socket_args = argument;
+  sockd = open_socket(socket_args->socket_port);
 
   listen(sockd, BACKLOG_LEN);
   size = sizeof(client);
   accepted_sockd = accept(sockd, (struct sockaddr *) &client, (socklen_t *) &size);
-  printf("socket connected\n");
-
   if (accepted_sockd < 0)
     perror("ERROR on accept");
 
-  while (accepted_sockd >= 0) {
-    union SECommand command;
-    reset_sprite_engine();
+  void *packet = malloc(socket_args->packet_size);
 
-    while (read(accepted_sockd, &command, sizeof(union SECommand)) > 0) {
-      queue_command(&command);
+  while (accepted_sockd >= 0) {
+    printf("client connected on port:%d\n", socket_args->socket_port);
+    socket_args->new_connection_delegate();
+
+    while (read(accepted_sockd, packet, socket_args->packet_size) > 0) {
+      socket_args->packet_received_delegate(packet);
     }
-    printf("socket connection closed\n");
+    printf("client connection closed on port:%d\n", socket_args->socket_port);
     accepted_sockd = accept(sockd, (struct sockaddr *) &client, (socklen_t *) &size);
   }
   close(sockd);
 
+  free(socket_args);
   return NULL;
 }
 
-void init_socket(void)
+void init_sockets(void)
 {
-  pthread_create(&server_socket_thread, NULL, server_socket_run_loop, NULL);
+  struct SocketLoopArgs *command_socket_arguments = malloc(sizeof(struct SocketLoopArgs));
+  command_socket_arguments->socket_port = COMMAND_SOCKET_PORT;
+  command_socket_arguments->packet_size = sizeof(union SECommand);
+  command_socket_arguments->new_connection_delegate = command_socket_new_connection_delegate;
+  command_socket_arguments->packet_received_delegate = command_socket_packet_received_delegate;
+
+  struct SocketLoopArgs *vsync_socket_arguments = malloc(sizeof(struct SocketLoopArgs));
+  vsync_socket_arguments->socket_port = SYNC_SOCKET_PORT;
+  vsync_socket_arguments->packet_size = sizeof(struct SEVsync);
+  vsync_socket_arguments->new_connection_delegate = vsync_socket_new_connection_delegate;
+  vsync_socket_arguments->packet_received_delegate = vsync_socket_packet_received_delegate;
+
+  pthread_create(&display_command_socket_thread, NULL, socket_run_loop, command_socket_arguments);
+  pthread_create(&display_sync_socket_thread, NULL, socket_run_loop, vsync_socket_arguments);
+}
+
+
+// Command Processing Socket
+
+void command_socket_new_connection_delegate(void)
+{
+  reset_sprite_engine();
+}
+
+void command_socket_packet_received_delegate(void *command)
+{
+  queue_command((union SECommand *)command);
+}
+
+// Vsync Processing Socket
+
+void vsync_socket_new_connection_delegate(void)
+{
+  // Do nothing
+}
+
+void vsync_socket_packet_received_delegate(void *command)
+{
+  // Unblock the processing thread
 }

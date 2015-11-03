@@ -21,8 +21,9 @@
 
 // meat and taters
 #define BACKLOG_LEN 1
-#define SOCKET_PORT 1985
+#define COMMAND_SOCKET_PORT 1985
+#define SYNC_SOCKET_PORT 1990
 
-void init_socket(void);
+void init_sockets(void);
 
 #endif

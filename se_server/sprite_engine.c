@@ -163,7 +163,6 @@ void reset_sprite_engine(void)
   }
 }
 
-
 void init_sprite_engine(void)
 {
   command_queue_mutex = (pthread_mutex_t) PTHREAD_MUTEX_INITIALIZER;

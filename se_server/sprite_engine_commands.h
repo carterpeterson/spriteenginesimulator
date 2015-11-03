@@ -45,6 +45,11 @@ union SECommand {
   struct SECommandUpdateVRAM update_vram;
 };
 
+struct SEVsync {
+  uint16_t magic;
+  uint32_t id;
+};
+
 /*void fillUpdateOAM(uint8_t oam_index, uint32_t val, struct SECommandUpdateOAM *cmd);
 void fillUpdateOAM(uint8_t oam_index, uint32_t val, struct SECommandUpdateOAM *cmd) {
   memset(cmd, 0, sizeof(struct SECommandUpdateOAM));

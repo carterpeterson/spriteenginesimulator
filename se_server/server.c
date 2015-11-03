@@ -11,7 +11,7 @@ void glut_process_render(void)
 int main(int argc, char **argv)
 {
   init_display();
-  init_socket();
+  init_sockets();
   init_sprite_engine();
 
   glutInit(&argc, argv);
