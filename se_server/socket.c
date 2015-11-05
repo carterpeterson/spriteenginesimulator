@@ -122,6 +122,7 @@ void command_socket_packet_received_delegate(void *command)
 {
   if (((union SECommand *) command)->type == UPDATE_OAM) {
     pthread_mutex_lock(&command_process_lock);
+    printf("update oam\n");
     process_command((union SECommand *) command);
     pthread_mutex_unlock(&command_process_lock);
   } else {

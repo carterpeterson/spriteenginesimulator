@@ -118,7 +118,7 @@ void test_pattern(void)
   }
   memory.color_palettes[0].colors[1].red = 255;
 
-  memory.vrende_oam_registers[0].enable = true;
+  /*memory.vrende_oam_registers[0].enable = true;
   for (; i < VRENDE_SIZE; i++) {
     for (j = 0; j < VRENDE_SIZE; j++) {
       memory.vrende_sprites[0].pixels[i + j*VRENDE_SIZE] = ((i*2) / VRENDE_SIZE) + 1;
@@ -156,10 +156,11 @@ void test_pattern(void)
   }
   memory.color_palettes[0].colors[4].green = 255;
   memory.color_palettes[0].colors[4].blue = 255;
+  */
 
-  for (i = 0; i < (NUM_MUNDANE_SPRITES - NUM_BACKGROUND_SPRITES); i++) {
+  /*for (i = 0; i < (NUM_MUNDANE_SPRITES - NUM_BACKGROUND_SPRITES); i++) {
     oam_registers[i].enable = true;
-  }
+    }*/
 }
 
 void init_sprite_engine(void)
@@ -175,8 +176,29 @@ void draw_mundane_sprites(void)
   i = (NUM_MUNDANE_SPRITES - NUM_BACKGROUND_SPRITES) - 1;
 
   while(i >= 0) {
-    if (oam_registers[i].enable == false)
+    if (oam_registers[i].enable == false) {
+      switch(i) {
+      case 112:
+        i = 55;
+        break;
+      case 120:
+        i = 115;
+        break;
+      case 56:
+        i = 120;
+        break;
+      case 116:
+        i = 111;
+        break;
+      case 121:
+        i = 119;
+        break;
+      default:
+        i--;
+        break;
+      };
       continue;
+    }
 
     sprite_size = (i < NUM_GRANDE_SPRITES) ? GRANDE_SIZE :
       (i < (NUM_GRANDE_SPRITES + NUM_VRENDE_SPRITES)) ? VRENDE_SIZE : VENTI_SIZE;
@@ -373,12 +395,7 @@ void generate_frame_buffer(void)
 
 void output_sprite_engine_frame(void)
 {
-  //struct timeval start_time, end_time;
-  //gettimeofday(&start_time, NULL);
   generate_frame_buffer();
-  //gettimeofday(&end_time, NULL);
-  //printf("microseconds for generate:%d\n", (end_time.tv_usec - start_time.tv_usec));
-
   render(); // all this does is schedule a render to happen via glut
 }
 
