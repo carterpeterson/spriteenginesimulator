@@ -25,13 +25,8 @@ typedef struct {
   uint8_t red, green, blue;
 } Pixel;
 
-extern Pixel *frame_buffer;
-//extern int width, height, pixel_width, pixel_height;
-extern pthread_mutex_t frame_buffer_lock;
-extern bool render_flag;
-
-void render(void);
-void init_display(void);
+void init_display(int argc, char **argv);
 void set_pixel(int i, int j, Pixel p);
+void render(void);
 
 #endif

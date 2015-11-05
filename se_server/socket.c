@@ -1,7 +1,10 @@
+#include <sys/time.h>
+
 #include "socket.h"
 
 pthread_t display_command_socket_thread;
 pthread_t display_sync_socket_thread;
+pthread_mutex_t command_process_lock;
 
 struct SocketLoopArgs {
   uint16_t socket_port;
@@ -74,8 +77,29 @@ void *socket_run_loop(void *argument)
   return NULL;
 }
 
+// dummy vsync thread cause no qemu
+void *dummy_vsync_refresh_thread(void *argument)
+{
+  struct timeval start_time, end_time;
+
+  while (1) {
+    pthread_mutex_lock(&command_process_lock);
+    // render the current state of the Sprite Engine
+    gettimeofday(&start_time, NULL);
+    output_sprite_engine_frame();
+    pthread_mutex_unlock(&command_process_lock);
+    gettimeofday(&end_time, NULL);
+
+    printf("microseconds for render:%d\n", (end_time.tv_usec - start_time.tv_usec));
+  }
+}
+
 void init_sockets(void)
 {
+  // setup the command processing lock
+  pthread_mutex_init(&command_process_lock, NULL);
+
+  // start the threads up
   struct SocketLoopArgs *command_socket_arguments = malloc(sizeof(struct SocketLoopArgs));
   command_socket_arguments->socket_port = COMMAND_SOCKET_PORT;
   command_socket_arguments->packet_size = sizeof(union SECommand);
@@ -89,9 +113,9 @@ void init_sockets(void)
   vsync_socket_arguments->packet_received_delegate = vsync_socket_packet_received_delegate;
 
   pthread_create(&display_command_socket_thread, NULL, socket_run_loop, command_socket_arguments);
-  pthread_create(&display_sync_socket_thread, NULL, socket_run_loop, vsync_socket_arguments);
+  pthread_create(&display_sync_socket_thread, NULL, dummy_vsync_refresh_thread, vsync_socket_arguments);
+  //pthread_create(&display_sync_socket_thread, NULL, socket_run_loop, vsync_socket_arguments);
 }
-
 
 // Command Processing Socket
 
@@ -102,7 +126,9 @@ void command_socket_new_connection_delegate(void)
 
 void command_socket_packet_received_delegate(void *command)
 {
-  queue_command((union SECommand *)command);
+  pthread_mutex_lock(&command_process_lock);
+  process_command((union SECommand *)command);
+  pthread_mutex_unlock(&command_process_lock);
 }
 
 // Vsync Processing Socket
@@ -114,5 +140,8 @@ void vsync_socket_new_connection_delegate(void)
 
 void vsync_socket_packet_received_delegate(void *command)
 {
-  // Unblock the processing thread
+  pthread_mutex_lock(&command_process_lock);
+  // render the current state of the Sprite Engine
+  output_sprite_engine_frame();
+  pthread_mutex_unlock(&command_process_lock);
 }

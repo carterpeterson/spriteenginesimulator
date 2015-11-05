@@ -52,13 +52,8 @@ typedef unsigned int uint;
 #define VRAM_CHUNK_BACKGROUND_BASE 0x00C0
 #define VRAM_CHUNK_BACKGROUND_MAX  0x010B
 
-// reutrns
-#define PIXEL_FOUND 0
-#define NO_PIXEL_FOUND 1
-
 void init_sprite_engine(void);
-void reset_sprite_engine(void);
-void queue_command(union SECommand *command);
-void process_commands(void);
+void process_command(union SECommand* command);
+void output_sprite_engine_frame(void);
 
 #endif

@@ -1,57 +1,53 @@
 #include "render.h"
 
 #define WINDOW_TITLE_STRING "SpriteEngine Server"
-
-int width, height, pixel_width, pixel_height;
-Pixel pixel_buffers[2][PIXELS_WIDTH * PIXELS_HEIGHT];
-Pixel *read_buffer, *frame_buffer;
-
+Pixel frame_buffer[PIXELS_WIDTH * PIXELS_HEIGHT];
 pthread_mutex_t frame_buffer_lock;
-bool render_flag;
 
-void init_display(void)
+void display_frame_buffer(void)
 {
-  pthread_mutex_init(&frame_buffer_lock, NULL);
-  render_flag = false;
+  // Do GL things
+  pthread_mutex_lock(&frame_buffer_lock);
+  glDrawPixels(PIXELS_WIDTH, PIXELS_HEIGHT, GL_RGB, GL_UNSIGNED_BYTE, frame_buffer);
+  pthread_mutex_unlock(&frame_buffer_lock);
+  glutSwapBuffers();
+}
 
-  frame_buffer = pixel_buffers[0];
-  read_buffer = pixel_buffers[1];
-
+void init_display(int argc, char **argv)
+{
   int i = 0;
   for(; i < PIXELS_WIDTH * PIXELS_HEIGHT; i++) {
     frame_buffer[i].red = 0;
     frame_buffer[i].green = 0;
     frame_buffer[i].blue = 0;
   }
+
+  // glut things
+  glutInit(&argc, argv);
+  glutInitDisplayMode(GLUT_RGB | GLUT_DOUBLE);
+  glutInitWindowSize(EMULATOR_WINDOW_WIDTH, EMULATOR_WINDOW_HEIGHT);
+  glutCreateWindow(WINDOW_TITLE_STRING);
+  glutDisplayFunc(display_frame_buffer);
+  glClearColor(0.3,0.3,0.3,1.0);
+  glViewport(0, 0, EMULATOR_WINDOW_WIDTH, EMULATOR_WINDOW_HEIGHT);
+
+  // setup the lock
+  pthread_mutex_init(&frame_buffer_lock, NULL);
 }
 
-void render_frame_buffer()
+void start_display(void)
 {
-  // Do GL things
-  glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-  glDrawPixels(PIXELS_WIDTH, PIXELS_HEIGHT, GL_RGB, GL_UNSIGNED_BYTE, frame_buffer);
-  glutSwapBuffers();
+  glutMainLoop();
 }
 
 void set_pixel(int i, int j, Pixel p)
 {
-  render_flag = true;
+  pthread_mutex_lock(&frame_buffer_lock);
   frame_buffer[(((PIXELS_HEIGHT - 1) - j) * PIXELS_WIDTH) + i] = p;
+  pthread_mutex_unlock(&frame_buffer_lock);
 }
 
-void render()
+void render(void)
 {
-  Pixel *temp;
-
-  if (render_flag == false)
-    return;
-
-  pthread_mutex_lock(&frame_buffer_lock);
-  temp = read_buffer;
-  read_buffer = frame_buffer;
-  frame_buffer = read_buffer;
-
-  render_flag = false;
-  pthread_mutex_unlock(&frame_buffer_lock);
-  render_frame_buffer();
+  glutPostRedisplay();
 }
