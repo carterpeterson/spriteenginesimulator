@@ -7,9 +7,9 @@ pthread_mutex_t frame_buffer_lock;
 void display_frame_buffer(void)
 {
   // Do GL things
-  pthread_mutex_lock(&frame_buffer_lock);
+  //  pthread_mutex_lock(&frame_buffer_lock);
   glDrawPixels(PIXELS_WIDTH, PIXELS_HEIGHT, GL_RGB, GL_UNSIGNED_BYTE, frame_buffer);
-  pthread_mutex_unlock(&frame_buffer_lock);
+  //pthread_mutex_unlock(&frame_buffer_lock);
   glutSwapBuffers();
 }
 
@@ -42,9 +42,9 @@ void start_display(void)
 
 void set_pixel(int i, int j, Pixel p)
 {
-  pthread_mutex_lock(&frame_buffer_lock);
+  //pthread_mutex_lock(&frame_buffer_lock);
   frame_buffer[(((PIXELS_HEIGHT - 1) - j) * PIXELS_WIDTH) + i] = p;
-  pthread_mutex_unlock(&frame_buffer_lock);
+  //pthread_mutex_unlock(&frame_buffer_lock);
 }
 
 void render(void)

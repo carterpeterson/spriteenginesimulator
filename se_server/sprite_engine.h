@@ -54,6 +54,7 @@ typedef unsigned int uint;
 
 void init_sprite_engine(void);
 void process_command(union SECommand* command);
+void process_commands(union SECommand* commands_base, int num_commands);
 void output_sprite_engine_frame(void);
 
 #endif

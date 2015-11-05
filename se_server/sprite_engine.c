@@ -103,9 +103,10 @@ void reset_sprite_engine(void)
   memset(&memory, 0x00, sizeof(struct SpriteEngineMemory));
   memset(&display_color_mapping, 0x00, sizeof(struct DisplayColorMapping));
   oam_registers = memory.grande_oam_registers;
+}
 
-  // test work
-  //oam_registers[0].flip_x = true;
+void test_pattern(void)
+{
   oam_registers[0].enable = true;
   oam_registers[0].y_offset = 200;
   oam_registers[0].x_offset = 200;
@@ -164,6 +165,7 @@ void reset_sprite_engine(void)
 void init_sprite_engine(void)
 {
   reset_sprite_engine();
+  test_pattern();
 }
 
 void draw_mundane_sprites(void)
@@ -180,6 +182,7 @@ void draw_mundane_sprites(void)
       (i < (NUM_GRANDE_SPRITES + NUM_VRENDE_SPRITES)) ? VRENDE_SIZE : VENTI_SIZE;
     x_offset = oam_registers[i].x_offset;
     y_offset = oam_registers[i].y_offset;
+
     switch(sprite_size) {
         case(GRANDE_SIZE):
           pixels = &(memory.grande_sprites[i].pixels[0]);
@@ -370,8 +373,13 @@ void generate_frame_buffer(void)
 
 void output_sprite_engine_frame(void)
 {
+  //struct timeval start_time, end_time;
+  //gettimeofday(&start_time, NULL);
   generate_frame_buffer();
-  render();
+  //gettimeofday(&end_time, NULL);
+  //printf("microseconds for generate:%d\n", (end_time.tv_usec - start_time.tv_usec));
+
+  render(); // all this does is schedule a render to happen via glut
 }
 
 void process_command(union SECommand *command)

@@ -80,17 +80,11 @@ void *socket_run_loop(void *argument)
 // dummy vsync thread cause no qemu
 void *dummy_vsync_refresh_thread(void *argument)
 {
-  struct timeval start_time, end_time;
-
   while (1) {
     pthread_mutex_lock(&command_process_lock);
     // render the current state of the Sprite Engine
-    gettimeofday(&start_time, NULL);
     output_sprite_engine_frame();
     pthread_mutex_unlock(&command_process_lock);
-    gettimeofday(&end_time, NULL);
-
-    printf("microseconds for render:%d\n", (end_time.tv_usec - start_time.tv_usec));
   }
 }
 
@@ -121,14 +115,18 @@ void init_sockets(void)
 
 void command_socket_new_connection_delegate(void)
 {
-  reset_sprite_engine();
+  //reset_sprite_engine();
 }
 
 void command_socket_packet_received_delegate(void *command)
 {
-  pthread_mutex_lock(&command_process_lock);
-  process_command((union SECommand *)command);
-  pthread_mutex_unlock(&command_process_lock);
+  if (((union SECommand *) command)->type == UPDATE_OAM) {
+    pthread_mutex_lock(&command_process_lock);
+    process_command((union SECommand *) command);
+    pthread_mutex_unlock(&command_process_lock);
+  } else {
+    process_command((union SECommand *) command);
+  }
 }
 
 // Vsync Processing Socket
