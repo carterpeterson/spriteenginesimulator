@@ -1,7 +1,7 @@
 #ifndef SESIMULATOR_SESERVER_RENDER_H
 #define SESIMULATOR_SESERVER_RENDER_H
 
-/* X library headers */
+/* GL library headers */
 #include <OpenGL/gl.h>
 #include <GLUT/glut.h>
 

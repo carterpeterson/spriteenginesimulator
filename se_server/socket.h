@@ -24,6 +24,14 @@
 #define COMMAND_SOCKET_PORT 1985
 #define SYNC_SOCKET_PORT 1990
 
+// controllers
+#define NUM_CONTROLLERS   4
+#define CONTROLLER_PORT_0 1986
+#define CONTROLLER_PORT_1 1987
+#define CONTROLLER_PORT_2 1988
+#define CONTROLLER_PORT_3 1989
+
 void init_sockets(void);
+void send_controller_update_packet(int controller, int status_register);
 
 #endif

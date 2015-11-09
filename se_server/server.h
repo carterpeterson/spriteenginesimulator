@@ -18,5 +18,6 @@
 #include "render.h"
 #include "socket.h"
 #include "sprite_engine.h"
+#include "input.h"
 
 #endif

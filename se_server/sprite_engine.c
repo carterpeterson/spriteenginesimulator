@@ -150,7 +150,6 @@ void test_pattern(void)
   memory.color_palettes[0].colors[6].red = 255;
   memory.color_palettes[0].colors[6].green = 255;
 
-  memory.background_oam_register.enable = true;
   for (i = 0; i < BACKGROUND_WIDTH * BACKGROUND_HEIGHT; i++) {
     memory.background_sprite.pixels[i] = 4;
   }
@@ -161,6 +160,7 @@ void test_pattern(void)
   /*for (i = 0; i < (NUM_MUNDANE_SPRITES - NUM_BACKGROUND_SPRITES); i++) {
     oam_registers[i].enable = true;
     }*/
+  memory.background_oam_register.enable = true;
 }
 
 void init_sprite_engine(void)
