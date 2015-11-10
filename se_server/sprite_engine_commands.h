@@ -49,6 +49,7 @@ union SECommand {
 struct SEVsync {
   uint16_t magic;
   uint32_t id;
+  bool is_ack;
 };
 
 /*void fillUpdateOAM(uint8_t oam_index, uint32_t val, struct SECommandUpdateOAM *cmd);

@@ -5,6 +5,7 @@
 pthread_t display_command_socket_thread;
 pthread_t display_sync_socket_thread;
 pthread_mutex_t command_process_lock;
+pthread_t second_timer_thread;
 int controller_sockets[NUM_CONTROLLERS];
 
 struct SocketLoopArgs {
@@ -103,15 +104,30 @@ void *socket_run_loop(void *argument)
 }
 
 // dummy vsync thread cause no qemu
-void *dummy_vsync_refresh_thread(void *argument)
+int packets_per_vsync = 0;
+/*void *dummy_vsync_refresh_thread(void *argument)
 {
   while (1) {
     pthread_mutex_lock(&command_process_lock);
     // render the current state of the Sprite Engine
+    if(packets_per_vsync > 0)
+       printf("packets last vsync:%d\n", packets_per_vsync);
     output_sprite_engine_frame();
+    packets_per_vsync = 0;
     pthread_mutex_unlock(&command_process_lock);
   }
+  }*/
+
+int vsyncs_last_second = 0;
+void *second_timer(void *argument)
+{
+  while(1) {
+    usleep(1000000);
+    printf("vsyncs last second:%d\n", vsyncs_last_second);
+    vsyncs_last_second = 0;
+  }
 }
+
 
 void init_sockets(void)
 {
@@ -138,8 +154,9 @@ void init_sockets(void)
   vsync_socket_arguments->packet_received_delegate = vsync_socket_packet_received_delegate;
 
   pthread_create(&display_command_socket_thread, NULL, socket_run_loop, command_socket_arguments);
-  pthread_create(&display_sync_socket_thread, NULL, dummy_vsync_refresh_thread, vsync_socket_arguments);
-  //pthread_create(&display_sync_socket_thread, NULL, socket_run_loop, vsync_socket_arguments);
+  //pthread_create(&display_sync_socket_thread, NULL, dummy_vsync_refresh_thread, vsync_socket_arguments);
+  pthread_create(&display_sync_socket_thread, NULL, socket_run_loop, vsync_socket_arguments);
+  pthread_create(&second_timer_thread, NULL, second_timer, NULL);
 }
 
 void send_controller_update_packet(int controller, int status_register)
@@ -177,9 +194,9 @@ void command_socket_new_connection_delegate(void)
 
 void command_socket_packet_received_delegate(void *command)
 {
+  packets_per_vsync++;
   if (((union SECommand *) command)->type == UPDATE_OAM) {
     pthread_mutex_lock(&command_process_lock);
-    //printf("update oam\n");
     process_command((union SECommand *) command);
     pthread_mutex_unlock(&command_process_lock);
   } else {
@@ -197,7 +214,12 @@ void vsync_socket_new_connection_delegate(void)
 void vsync_socket_packet_received_delegate(void *command)
 {
   pthread_mutex_lock(&command_process_lock);
+
+  vsyncs_last_second++;
   // render the current state of the Sprite Engine
+  printf("packets last vsync:%d\n", packets_per_vsync);
   output_sprite_engine_frame();
+  packets_per_vsync = 0;
+
   pthread_mutex_unlock(&command_process_lock);
 }
