@@ -217,7 +217,7 @@ void vsync_socket_packet_received_delegate(void *command)
 
   vsyncs_last_second++;
   // render the current state of the Sprite Engine
-  printf("packets last vsync:%d\n", packets_per_vsync);
+  //printf("packets last vsync:%d\n", packets_per_vsync);
   output_sprite_engine_frame();
   packets_per_vsync = 0;
 
