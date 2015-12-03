@@ -12,7 +12,7 @@ SERVER_SOURCES:=$(addprefix $(SERVER_DIR)/, $(SERVER_SOURCES))
 
 all: server
 
-server:
+server: $(SERVER_SOURCES)
 	$(CC) $(CFLAGS) -o $(TARGET) $(SERVER_SOURCES)
 
 clean:
