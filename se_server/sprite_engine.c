@@ -226,7 +226,7 @@ void draw_mundane_sprites(void)
         break;
 
       for (sprite_y = 0; sprite_y < sprite_size; sprite_y++) {
-        frame_y = (memory.instance_oam_registers[i].flip_x ? (sprite_size - sprite_y) : sprite_y) + y_offset;
+        frame_y = (oam_registers[i].flip_x ? (sprite_size - sprite_y) : sprite_y) + y_offset;
         if(frame_y >= SPRITE_ENGINE_HEIGHT)
           break;
 
