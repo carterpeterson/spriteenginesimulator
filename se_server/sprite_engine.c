@@ -311,8 +311,8 @@ void draw_instance_sprites(void)
     for (sprite_x = 0; sprite_x < sprite_size_x; sprite_x++) {
       for (sprite_y = 0; sprite_y < sprite_size_y; sprite_y++) {
         if (transpose) {
-          frame_x = (memory.instance_oam_registers[i].flip_y ? (sprite_size_x - sprite_y) : sprite_y) + x_offset;
-          frame_y = (memory.instance_oam_registers[i].flip_x ? (sprite_size_y - sprite_x) : sprite_x) + y_offset;
+          frame_x = (memory.instance_oam_registers[i].flip_x ? (sprite_size_x - sprite_y) : sprite_y) + x_offset;
+          frame_y = (memory.instance_oam_registers[i].flip_y ? (sprite_size_y - sprite_x) : sprite_x) + y_offset;
         } else {
           frame_x = (memory.instance_oam_registers[i].flip_y ? (sprite_size_x - sprite_x) : sprite_x) + x_offset;
           frame_y = (memory.instance_oam_registers[i].flip_x ? (sprite_size_y - sprite_y) : sprite_y) + y_offset;
