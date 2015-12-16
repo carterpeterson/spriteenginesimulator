@@ -1,4 +1,5 @@
 #include "sprite_engine.h"
+#include <sys/time.h>
 
 // engine definitions
 
@@ -395,12 +396,20 @@ void generate_frame_buffer(void)
 
 void output_sprite_engine_frame(void)
 {
+  struct timeval tv_start, tv_end;
+  gettimeofday(&tv_start, NULL);
+
   generate_frame_buffer();
   render(); // all this does is schedule a render to happen via glut
+
+  gettimeofday(&tv_end, NULL);
+  unsigned long time_in_micros = (1000000 * tv_end.tv_sec + tv_end.tv_usec) - (1000000 * tv_start.tv_sec + tv_start.tv_usec);
+  printf("Frame Render Time: %lu\n\r", time_in_micros);
 }
 
 void process_command(union SECommand *command)
 {
+
   switch (command->type) {
   case UPDATE_OAM :
     if (command->update_oam.oam_index < NUM_MUNDANE_SPRITES) {
@@ -412,7 +421,7 @@ void process_command(union SECommand *command)
       oam_registers[command->update_oam.oam_index].y_offset = command->update_oam.y_offset;
     } else if (command->update_oam.oam_index >= INSTANCE_INDEX_MIN && command->update_oam.oam_index < INSTANCE_INDEX_MAX) {
       // update instace sprite
-      uint oam_index = command->update_oam.oam_index - INSTANCE_INDEX_MIN;
+      uint oam_index = (command->update_oam.oam_index - INSTANCE_INDEX_MIN) / 2;
       memory.instance_oam_registers[oam_index].enable = command->update_oam.enable;
       memory.instance_oam_registers[oam_index].palette = command->update_oam.palette;
       memory.instance_oam_registers[oam_index].flip_x = command->update_oam.flip_x;
