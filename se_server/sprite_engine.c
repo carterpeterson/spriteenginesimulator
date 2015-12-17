@@ -404,7 +404,7 @@ void output_sprite_engine_frame(void)
 
   gettimeofday(&tv_end, NULL);
   unsigned long time_in_micros = (1000000 * tv_end.tv_sec + tv_end.tv_usec) - (1000000 * tv_start.tv_sec + tv_start.tv_usec);
-  printf("Frame Render Time: %lu\n\r", time_in_micros);
+  // printf("Frame Render Time: %lu\n\r", time_in_micros);
 }
 
 void process_command(union SECommand *command)
@@ -462,7 +462,7 @@ void process_command(union SECommand *command)
                   + pixel_x] = command->update_vram.p_data;
       } else if (command->update_vram.chunk < VRAM_CHUNK_BACKGROUND_BASE) { // VENTI CHUNKS
         chunk_index -= VRAM_CHUNK_VENTI_BASE;
-        memory.vrende_sprites[chunk_index / 16]
+        memory.venti_sprites[chunk_index / 16]
           .pixels[((chunk_index % 16) / 4) * (4 * GRANDE_SIZE * GRANDE_SIZE)
                   + (chunk_index % 4) * GRANDE_SIZE
                   + (pixel_y * 4 * GRANDE_SIZE)
